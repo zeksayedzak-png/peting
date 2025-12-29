@@ -1,13 +1,33 @@
--- 🐾 Pet System Mobile Edition
+-- 🐾 Pet System Mobile Edition - FIXED
 -- التشغيل: loadstring(game:HttpGet("رابط_الباستبين"))()
 
 -- ====================
 -- 1. المكتبات الأساسية
 -- ====================
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local success, Rayfield = pcall(function()
+    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+end)
+
+if not success then
+    Rayfield = {
+        CreateWindow = function() 
+            return {
+                CreateTab = function() 
+                    return {
+                        CreateInput = function() end,
+                        CreateSlider = function() end,
+                        CreateButton = function() end,
+                        CreateLabel = function() end,
+                        CreateToggle = function() end
+                    }
+                end
+            }
+        end,
+        Notify = function() print("Notification") end
+    }
+end
+
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 
 -- ====================
@@ -33,7 +53,7 @@ function PetSystem:GenerateUUID()
 end
 
 -- ====================
--- 3. إنشاء حيوان حقيقي
+-- 3. إنشاء حيوان (بدون AssetId مشكلة)
 -- ====================
 function PetSystem:CreateRealPet(player, petType, customWeight, customAge)
     -- توليد UUID
@@ -66,24 +86,48 @@ function PetSystem:CreateRealPet(player, petType, customWeight, customAge)
     table.insert(self.PetUUIDs[player.UserId], petUUID)
     
     -- ====================
-    -- 4. إنشاء النموذج 3D
+    -- 4. إنشاء نموذج بسيط (بدون AssetId)
     -- ====================
-    local success, petModel = pcall(function()
-        return game:GetObjects("rbxassetid://137696262122157")[1]
-    end)
-    
-    if not success then
-        warn("❌ فشل تحميل نموذج الحيوان")
-        return petData
-    end
-    
+    local petModel = Instance.new("Model")
     petModel.Name = "Pet_" .. petUUID
+    
+    -- رأس الحيوان
+    local head = Instance.new("Part")
+    head.Name = "Head"
+    head.Size = Vector3.new(2, 2, 2)
+    head.Shape = Enum.PartType.Ball
+    head.BrickColor = BrickColor.new("Bright blue")
+    head.Material = Enum.Material.Neon
+    head.Parent = petModel
+    
+    -- جسم الحيوان
+    local body = Instance.new("Part")
+    body.Name = "Body"
+    body.Size = Vector3.new(3, 2, 4)
+    body.BrickColor = BrickColor.new("Bright blue")
+    body.Parent = petModel
+    
+    -- Humanoid للحركة
+    local humanoid = Instance.new("Humanoid")
+    humanoid.WalkSpeed = 16
+    humanoid.Parent = petModel
+    
+    -- PrimaryPart
+    petModel.PrimaryPart = head
+    
+    -- تثبيت الجسم مع الرأس
+    local weld = Instance.new("Weld")
+    weld.Part0 = head
+    weld.Part1 = body
+    weld.C0 = CFrame.new(0, -1.5, 0)
+    weld.Parent = head
+    
+    -- وضع النموذج في العالم
     petModel.Parent = workspace
     
-    -- وضع بجانب اللاعب
     if player.Character and player.Character.PrimaryPart then
         petModel:SetPrimaryPartCFrame(
-            player.Character.PrimaryPart.CFrame * CFrame.new(3, 0, 0)
+            player.Character.PrimaryPart.CFrame * CFrame.new(5, 0, 0)
         )
     end
     
@@ -95,47 +139,31 @@ function PetSystem:CreateRealPet(player, petType, customWeight, customAge)
     petModel:SetAttribute("Age", petData.Attributes.Age)
     
     -- ====================
-    -- 5. إضافة الحركات
+    -- 5. الحركات البسيطة
     -- ====================
-    local humanoid = petModel:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        local animation = Instance.new("Animation")
-        animation.AnimationId = "rbxassetid://79220061824163"
-        
-        local animator = humanoid:FindFirstChildOfClass("Animator")
-        if animator then
-            local animationTrack = animator:LoadAnimation(animation)
-            animationTrack:Play()
+    spawn(function()
+        while petModel and petModel.Parent do
+            wait(1)
+            -- حركة اهتزاز بسيطة
+            head.CFrame = head.CFrame * CFrame.new(0, math.sin(tick())*0.1, 0)
         end
-    end
+    end)
     
     -- ====================
-    -- 6. نظام المتابعة
+    -- 6. نظام المتابعة البسيط
     -- ====================
     self.PetModels[petUUID] = petModel
     
-    -- تتبع اللاعب
     spawn(function()
         while petModel and petModel.Parent do
-            wait(0.5)
-            if player.Character and player.Character.PrimaryPart then
+            wait(0.3)
+            if player.Character and player.Character.PrimaryPart and humanoid then
                 local targetPos = player.Character.PrimaryPart.Position
                 local petPos = petModel.PrimaryPart.Position
-                
-                -- حساب المسافة
                 local distance = (targetPos - petPos).Magnitude
                 
-                if distance > 10 then
-                    -- إذا كان بعيداً، ينتقل فوراً
-                    petModel:SetPrimaryPartCFrame(
-                        CFrame.new(targetPos + Vector3.new(3, 0, 0))
-                    )
-                elseif distance > 5 then
-                    -- إذا كان قريباً، يمشي تجاهه
-                    petModel.PrimaryPart.CFrame = CFrame.lookAt(
-                        petPos,
-                        targetPos
-                    )
+                if distance > 8 then
+                    humanoid:MoveTo(targetPos + Vector3.new(3, 0, 3))
                 end
             end
         end
@@ -148,14 +176,20 @@ function PetSystem:CreateRealPet(player, petType, customWeight, customAge)
     petTool.Name = petType .. " [" .. petData.Attributes.Weight .. "KG] [Age:" .. petData.Attributes.Age .. "]"
     petTool.Parent = player.Backpack
     
+    local handle = Instance.new("Part")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(1, 1, 1)
+    handle.BrickColor = BrickColor.new("Bright blue")
+    handle.Parent = petTool
+    
     petTool:SetAttribute("PET_UUID", petUUID)
     petTool:SetAttribute("PetType", petType)
     
     -- عند تفعيل الأداة
     petTool.Activated:Connect(function()
-        if petModel then
+        if petModel and localPlayer.Character and localPlayer.Character.PrimaryPart then
             petModel:SetPrimaryPartCFrame(
-                localPlayer.Character.PrimaryPart.CFrame * CFrame.new(0, 0, -2)
+                localPlayer.Character.PrimaryPart.CFrame * CFrame.new(0, 0, -3)
             )
         end
     end)
@@ -164,17 +198,16 @@ function PetSystem:CreateRealPet(player, petType, customWeight, customAge)
 end
 
 -- ====================
--- 8. واجهة المستخدم
+-- 8. واجهة المستخدم البسيطة
 -- ====================
 local Window = Rayfield:CreateWindow({
-    Name = "🐾 نظام الحيوانات الأليفة",
-    LoadingTitle = "جاري تحميل النظام...",
-    LoadingSubtitle = "Mobile Edition",
+    Name = "🐾 نظام الحيوانات البسيط",
+    LoadingTitle = "جاري التحميل...",
     ConfigurationSaving = { Enabled = false }
 })
 
 -- تبويب إنشاء الحيوان
-local CreateTab = Window:CreateTab("إنشاء حيوان", nil)
+local CreateTab = Window:CreateTab("إنشاء", nil)
 
 local petName = "Capybara"
 local petWeight = 50
@@ -182,14 +215,14 @@ local petAge = 0
 
 CreateTab:CreateInput({
     Name = "اسم الحيوان",
-    PlaceholderText = "Capybara",
+    PlaceholderText = "أدخل الاسم",
     Callback = function(Text)
         petName = Text
     end
 })
 
 CreateTab:CreateSlider({
-    Name = "الوزن (KG)",
+    Name = "الوزن",
     Range = {1, 200},
     Increment = 1,
     Suffix = "KG",
@@ -203,7 +236,7 @@ CreateTab:CreateSlider({
     Name = "العمر",
     Range = {0, 100},
     Increment = 1,
-    Suffix = "أيام",
+    Suffix = "يوم",
     CurrentValue = 0,
     Callback = function(Value)
         petAge = Value
@@ -211,123 +244,118 @@ CreateTab:CreateSlider({
 })
 
 CreateTab:CreateButton({
-    Name = "🐾 إنشاء حيوان جديد",
+    Name = "🐾 إنشاء حيوان",
     Callback = function()
-        if not localPlayer.Character then return end
+        if not localPlayer.Character then 
+            print("❌ اللاعب ليس في العالم")
+            return 
+        end
         
-        local petSystem = _G.PetSystem or PetSystem.new()
-        _G.PetSystem = petSystem
+        if not _G.PetSystem then
+            _G.PetSystem = PetSystem.new()
+        end
         
-        local petData = petSystem:CreateRealPet(
+        local petData = _G.PetSystem:CreateRealPet(
             localPlayer, 
             petName, 
             petWeight, 
             petAge
         )
         
+        print("✅ تم إنشاء حيوان:")
+        print("   النوع:", petData.Type)
+        print("   الوزن:", petData.Attributes.Weight)
+        print("   العمر:", petData.Attributes.Age)
+        print("   UUID:", petData.UUID)
+        
         Rayfield:Notify({
-            Title = "✅ تم إنشاء الحيوان",
-            Content = "UUID: " .. petData.UUID,
+            Title = "✅ تم الإنشاء",
+            Content = petData.Type .. " - " .. petData.UUID,
             Duration = 5
         })
     end
 })
 
--- تبويب إدارة الحيوانات
-local ManageTab = Window:CreateTab("حيواناتي", nil)
+-- تبويب إدارة
+local ManageTab = Window:CreateTab("الإدارة", nil)
 
 ManageTab:CreateButton({
-    Name = "🔄 تحديث القائمة",
+    Name = "📋 عرض حيواناتي",
     Callback = function()
         local petSystem = _G.PetSystem
-        if not petSystem then return end
+        if not petSystem then 
+            print("❌ لا يوجد نظام حيوانات")
+            return 
+        end
         
-        local pets = petSystem:GetPlayerPets(localPlayer)
+        local pets = petSystem.PetUUIDs[localPlayer.UserId] or {}
         
-        for _, uuid in pairs(pets) do
-            local petData = petSystem.Pets[uuid]
-            if petData then
-                ManageTab:CreateLabel(
-                    "🐾 " .. petData.Type .. 
-                    " | الوزن: " .. petData.Attributes.Weight .. "KG" ..
-                    " | العمر: " .. petData.Attributes.Age .. " يوم"
-                )
+        if #pets == 0 then
+            print("📭 لا يوجد حيوانات")
+        else
+            print("===== حيواناتي =====")
+            for _, uuid in pairs(pets) do
+                local petData = petSystem.Pets[uuid]
+                if petData then
+                    print("🐾 " .. petData.Type)
+                    print("   الوزن: " .. petData.Attributes.Weight .. "KG")
+                    print("   العمر: " .. petData.Attributes.Age .. " يوم")
+                    print("   UUID: " .. uuid)
+                    print("-----------------")
+                end
             end
         end
     end
 })
 
 -- تبويب الأوامر
-local CommandsTab = Window:CreateTab("أوامر", nil)
+local CmdTab = Window:CreateTab("أوامر", nil)
 
-CommandsTab:CreateButton({
-    Name = "📊 عرض كل الحيوانات في _G",
+CmdTab:CreateButton({
+    Name = "🔍 عرض _G.PetSystem",
     Callback = function()
-        local petSystem = _G.PetSystem
-        if not petSystem then return end
-        
-        print("===== كل الحيوانات في النظام =====")
-        for uuid, data in pairs(petSystem.Pets) do
-            print("UUID:", uuid)
-            print("النوع:", data.Type)
-            print("المالك:", data.OwnerName)
-            print("الوزن:", data.Attributes.Weight)
-            print("العمر:", data.Attributes.Age)
-            print("------------------------")
+        print("===== _G.PetSystem =====")
+        if _G.PetSystem then
+            for key, value in pairs(_G.PetSystem) do
+                print(key, "=", type(value))
+            end
+        else
+            print("❌ _G.PetSystem غير موجود")
         end
     end
 })
 
--- ====================
--- 9. النظام التلقائي
--- ====================
-local autoSystem = Window:CreateTab("النظام التلقائي", nil)
-
-local autoFollow = true
-autoSystem:CreateToggle({
-    Name = "👣 المتابعة التلقائية",
-    CurrentValue = true,
-    Callback = function(Value)
-        autoFollow = Value
-    end
-})
-
--- تحديث سنوي تلقائي
-spawn(function()
-    while true do
-        wait(60) -- كل دقيقة (يمكن تغييره لـ 86400 ليكون يومي)
-        
-        local petSystem = _G.PetSystem
-        if petSystem then
-            for uuid, petData in pairs(petSystem.Pets) do
-                if petData.Owner == localPlayer.UserId then
-                    petData.Attributes.Age = petData.Attributes.Age + 1
-                    
-                    -- تحديث النموذج
-                    local model = petSystem.PetModels[uuid]
-                    if model then
-                        model:SetAttribute("Age", petData.Attributes.Age)
-                    end
+CmdTab:CreateButton({
+    Name = "🗑️ حذف كل الحيوانات",
+    Callback = function()
+        if _G.PetSystem then
+            for uuid, model in pairs(_G.PetSystem.PetModels) do
+                if model then
+                    model:Destroy()
                 end
             end
+            _G.PetSystem.Pets = {}
+            _G.PetSystem.PetUUIDs = {}
+            _G.PetSystem.PetModels = {}
+            print("✅ تم حذف كل الحيوانات")
         end
     end
-end)
-
--- ====================
--- 10. التنبيهات
--- ====================
-Rayfield:Notify({
-    Title = "🐾 نظام الحيوانات جاهز",
-    Content = "يمكنك الآن إنشاء حيواناتك الأليفة!",
-    Duration = 6
 })
 
 -- ====================
--- 11. تعيين النظام في _G
+-- 9. تعيين النظام في _G
 -- ====================
 _G.PetSystem = PetSystem.new()
 
-print("✅ نظام الحيوانات المحمول جاهز للاستخدام!")
+print("=====================================")
+print("✅ نظام الحيوانات المحمول جاهز!")
 print("📱 تم تصميمه للعمل على الهاتف")
-print("🔗 التشغيل: loadstring(game:HttpGet('رابط_السكريبت'))()")
+print("🔗 التشغيل: loadstring(game:HttpGet('...'))()")
+print("=====================================")
+
+-- إنشاء حيوان افتراضي تلقائي
+wait(2)
+if localPlayer.Character then
+    local defaultPet = _G.PetSystem:CreateRealPet(localPlayer, "Capybara", 50, 0)
+    print("🐾 تم إنشاء حيوان افتراضي:", defaultPet.UUID)
+end
