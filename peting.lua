@@ -1,26 +1,18 @@
--- =============================================================================
--- PET SYSTEM ONLY - FROM ORIGINAL SCRIPT
--- Works on Mobile with Delta + loadstring
--- Draggable Small UI in Center
--- =============================================================================
+-- 🐾 Pet System Mobile Edition
+-- التشغيل: loadstring(game:HttpGet("رابط_الباستبين"))()
 
--- Load Roblox Services
+-- ====================
+-- 1. المكتبات الأساسية
+-- ====================
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 
--- Wait for game to load
-if not game:IsLoaded() then
-    game.Loaded:Wait()
-end
-
-localPlayer:WaitForChild("PlayerGui")
-wait(1)
-
--- =============================================================================
--- EXACT PET SYSTEM FROM ORIGINAL SCRIPT (LINES 104-190)
--- =============================================================================
-
+-- ====================
+-- 2. النظام الأساسي
+-- ====================
 local PetSystem = {}
 PetSystem.__index = PetSystem
 
@@ -28,7 +20,7 @@ function PetSystem.new()
     local self = setmetatable({}, PetSystem)
     self.Pets = {}
     self.PetUUIDs = {}
-    self.PetAttributes = {}
+    self.PetModels = {}
     return self
 end
 
@@ -40,19 +32,23 @@ function PetSystem:GenerateUUID()
     end)
 end
 
-function PetSystem:AddPet(player, petType, customUUID, weight, age)
-    local petUUID = customUUID or self:GenerateUUID()
+-- ====================
+-- 3. إنشاء حيوان حقيقي
+-- ====================
+function PetSystem:CreateRealPet(player, petType, customWeight, customAge)
+    -- توليد UUID
+    local petUUID = self:GenerateUUID()
     
-    -- EXACT DATA STRUCTURE FROM ORIGINAL (Lines 128-146)
+    -- بيانات الحيوان
     local petData = {
-        Type = petType,
+        Type = petType or "Capybara",
         UUID = petUUID,
         Owner = player.UserId,
         OwnerName = player.Name,
         Created = os.time(),
         Attributes = {
-            Weight = weight or math.random(1, 100),
-            Age = age or 0,
+            Weight = customWeight or math.random(1, 100),
+            Age = customAge or 0,
             Hunger = 100,
             Happiness = 100,
             Level = 1,
@@ -61,316 +57,277 @@ function PetSystem:AddPet(player, petType, customUUID, weight, age)
         }
     }
     
-    -- EXACT STORAGE FROM ORIGINAL (Lines 148-156)
+    -- تخزين البيانات
     self.Pets[petUUID] = petData
     
     if not self.PetUUIDs[player.UserId] then
         self.PetUUIDs[player.UserId] = {}
     end
-    
     table.insert(self.PetUUIDs[player.UserId], petUUID)
     
-    -- EXACT TOOL CREATION FROM ORIGINAL (Lines 178-190)
+    -- ====================
+    -- 4. إنشاء النموذج 3D
+    -- ====================
+    local success, petModel = pcall(function()
+        return game:GetObjects("rbxassetid://137696262122157")[1]
+    end)
+    
+    if not success then
+        warn("❌ فشل تحميل نموذج الحيوان")
+        return petData
+    end
+    
+    petModel.Name = "Pet_" .. petUUID
+    petModel.Parent = workspace
+    
+    -- وضع بجانب اللاعب
+    if player.Character and player.Character.PrimaryPart then
+        petModel:SetPrimaryPartCFrame(
+            player.Character.PrimaryPart.CFrame * CFrame.new(3, 0, 0)
+        )
+    end
+    
+    -- إضافة Attributes للنموذج
+    petModel:SetAttribute("PetUUID", petUUID)
+    petModel:SetAttribute("Owner", player.Name)
+    petModel:SetAttribute("PetType", petType)
+    petModel:SetAttribute("Weight", petData.Attributes.Weight)
+    petModel:SetAttribute("Age", petData.Attributes.Age)
+    
+    -- ====================
+    -- 5. إضافة الحركات
+    -- ====================
+    local humanoid = petModel:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        local animation = Instance.new("Animation")
+        animation.AnimationId = "rbxassetid://79220061824163"
+        
+        local animator = humanoid:FindFirstChildOfClass("Animator")
+        if animator then
+            local animationTrack = animator:LoadAnimation(animation)
+            animationTrack:Play()
+        end
+    end
+    
+    -- ====================
+    -- 6. نظام المتابعة
+    -- ====================
+    self.PetModels[petUUID] = petModel
+    
+    -- تتبع اللاعب
+    spawn(function()
+        while petModel and petModel.Parent do
+            wait(0.5)
+            if player.Character and player.Character.PrimaryPart then
+                local targetPos = player.Character.PrimaryPart.Position
+                local petPos = petModel.PrimaryPart.Position
+                
+                -- حساب المسافة
+                local distance = (targetPos - petPos).Magnitude
+                
+                if distance > 10 then
+                    -- إذا كان بعيداً، ينتقل فوراً
+                    petModel:SetPrimaryPartCFrame(
+                        CFrame.new(targetPos + Vector3.new(3, 0, 0))
+                    )
+                elseif distance > 5 then
+                    -- إذا كان قريباً، يمشي تجاهه
+                    petModel.PrimaryPart.CFrame = CFrame.lookAt(
+                        petPos,
+                        targetPos
+                    )
+                end
+            end
+        end
+    end)
+    
+    -- ====================
+    -- 7. إنشاء Tool في الحقيبة
+    -- ====================
     local petTool = Instance.new("Tool")
-    petTool.Name = petType .. " [" .. petData.Attributes.Weight .. " KG] [Age " .. petData.Attributes.Age .. "]"
+    petTool.Name = petType .. " [" .. petData.Attributes.Weight .. "KG] [Age:" .. petData.Attributes.Age .. "]"
     petTool.Parent = player.Backpack
     
-    -- EXACT ATTRIBUTES FROM ORIGINAL
     petTool:SetAttribute("PET_UUID", petUUID)
-    petTool:SetAttribute("OWNER", player.Name)
-    petTool:SetAttribute("ItemType", "Pet")
     petTool:SetAttribute("PetType", petType)
-    petTool:SetAttribute("b", tostring(petData.Attributes.Weight))
-    petTool:SetAttribute("d", false)
-    petTool:SetAttribute("a", player.Name)
     
-    print("✅ Pet Created: " .. petType .. " for " .. player.Name .. " (UUID: " .. petUUID .. ")")
+    -- عند تفعيل الأداة
+    petTool.Activated:Connect(function()
+        if petModel then
+            petModel:SetPrimaryPartCFrame(
+                localPlayer.Character.PrimaryPart.CFrame * CFrame.new(0, 0, -2)
+            )
+        end
+    end)
+    
     return petData
 end
 
-function PetSystem:GetPetByUUID(uuid)
-    return self.Pets[uuid]
-end
+-- ====================
+-- 8. واجهة المستخدم
+-- ====================
+local Window = Rayfield:CreateWindow({
+    Name = "🐾 نظام الحيوانات الأليفة",
+    LoadingTitle = "جاري تحميل النظام...",
+    LoadingSubtitle = "Mobile Edition",
+    ConfigurationSaving = { Enabled = false }
+})
 
-function PetSystem:GetPlayerPets(player)
-    local userId = typeof(player) == "number" and player or player.UserId
-    return self.PetUUIDs[userId] or {}
-end
+-- تبويب إنشاء الحيوان
+local CreateTab = Window:CreateTab("إنشاء حيوان", nil)
 
-function PetSystem:UpdatePetAttribute(petUUID, attribute, value)
-    local pet = self.Pets[petUUID]
-    if pet and pet.Attributes[attribute] then
-        pet.Attributes[attribute] = value
-        return true
+local petName = "Capybara"
+local petWeight = 50
+local petAge = 0
+
+CreateTab:CreateInput({
+    Name = "اسم الحيوان",
+    PlaceholderText = "Capybara",
+    Callback = function(Text)
+        petName = Text
     end
-    return false
-end
+})
 
--- =============================================================================
--- DRAGGABLE UI (Small Window in Center)
--- =============================================================================
-
--- Create ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "PetCreatorMobile"
-screenGui.Parent = localPlayer.PlayerGui
-
--- Main Frame (Small, Centered, Draggable)
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 250, 0, 200)  -- Small size
-mainFrame.Position = UDim2.new(0.5, -125, 0.5, -100)  -- Center
-mainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-mainFrame.BorderSizePixel = 2
-mainFrame.BorderColor3 = Color3.fromRGB(0, 120, 215)
-mainFrame.Parent = screenGui
-
--- Title Bar (For Dragging)
-local titleBar = Instance.new("Frame")
-titleBar.Name = "TitleBar"
-titleBar.Size = UDim2.new(1, 0, 0, 25)
-titleBar.BackgroundColor3 = Color3.fromRGB(0, 90, 180)
-titleBar.Parent = mainFrame
-
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Name = "TitleLabel"
-titleLabel.Size = UDim2.new(1, -10, 1, 0)
-titleLabel.Position = UDim2.new(0, 5, 0, 0)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "🐉 Create Pet"
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 14
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Parent = titleBar
-
--- Close Button (Small X)
-local closeButton = Instance.new("TextButton")
-closeButton.Name = "CloseButton"
-closeButton.Size = UDim2.new(0, 20, 0, 20)
-closeButton.Position = UDim2.new(1, -22, 0, 2)
-closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-closeButton.Text = "X"
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.TextSize = 12
-closeButton.Parent = titleBar
-
-closeButton.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
-
--- Input Frame
-local inputFrame = Instance.new("Frame")
-inputFrame.Name = "InputFrame"
-inputFrame.Size = UDim2.new(1, -10, 1, -35)
-inputFrame.Position = UDim2.new(0, 5, 0, 30)
-inputFrame.BackgroundTransparency = 1
-inputFrame.Parent = mainFrame
-
--- Pet Name Input (EXACTLY like original needs)
-local nameLabel = Instance.new("TextLabel")
-nameLabel.Name = "NameLabel"
-nameLabel.Size = UDim2.new(1, 0, 0, 20)
-nameLabel.Position = UDim2.new(0, 0, 0, 5)
-nameLabel.BackgroundTransparency = 1
-nameLabel.Text = "Pet Name:"
-nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-nameLabel.TextSize = 12
-nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-nameLabel.Parent = inputFrame
-
-local nameBox = Instance.new("TextBox")
-nameBox.Name = "NameBox"
-nameBox.Size = UDim2.new(1, 0, 0, 25)
-nameBox.Position = UDim2.new(0, 0, 0, 25)
-nameBox.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-nameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-nameBox.Text = "Dragon"
-nameBox.PlaceholderText = "Enter pet name..."
-nameBox.Parent = inputFrame
-
--- Weight Input (For KG like original)
-local weightLabel = Instance.new("TextLabel")
-weightLabel.Name = "WeightLabel"
-weightLabel.Size = UDim2.new(0.48, 0, 0, 20)
-weightLabel.Position = UDim2.new(0, 0, 0, 60)
-weightLabel.BackgroundTransparency = 1
-weightLabel.Text = "Weight (KG):"
-weightLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-weightLabel.TextSize = 12
-weightLabel.TextXAlignment = Enum.TextXAlignment.Left
-weightLabel.Parent = inputFrame
-
-local weightBox = Instance.new("TextBox")
-weightBox.Name = "WeightBox"
-weightBox.Size = UDim2.new(0.48, 0, 0, 25)
-weightBox.Position = UDim2.new(0, 0, 0, 80)
-weightBox.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-weightBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-weightBox.Text = "50"
-weightBox.Parent = inputFrame
-
--- Age Input (Like original)
-local ageLabel = Instance.new("TextLabel")
-ageLabel.Name = "AgeLabel"
-ageLabel.Size = UDim2.new(0.48, 0, 0, 20)
-ageLabel.Position = UDim2.new(0.52, 0, 0, 60)
-ageLabel.BackgroundTransparency = 1
-ageLabel.Text = "Age:"
-ageLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-ageLabel.TextSize = 12
-ageLabel.TextXAlignment = Enum.TextXAlignment.Left
-ageLabel.Parent = inputFrame
-
-local ageBox = Instance.new("TextBox")
-ageBox.Name = "AgeBox"
-ageBox.Size = UDim2.new(0.48, 0, 0, 25)
-ageBox.Position = UDim2.new(0.52, 0, 0, 80)
-ageBox.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-ageBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-ageBox.Text = "3"
-ageBox.Parent = inputFrame
-
--- Create Button (Main Action)
-local createButton = Instance.new("TextButton")
-createButton.Name = "CreateButton"
-createButton.Size = UDim2.new(1, 0, 0, 35)
-createButton.Position = UDim2.new(0, 0, 1, -40)
-createButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-createButton.Text = "➕ CREATE PET"
-createButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-createButton.TextSize = 14
-createButton.Parent = inputFrame
-
--- Status Label (For feedback)
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Name = "StatusLabel"
-statusLabel.Size = UDim2.new(1, 0, 0, 20)
-statusLabel.Position = UDim2.new(0, 0, 0, 115)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Ready..."
-statusLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
-statusLabel.TextSize = 11
-statusLabel.TextWrapped = true
-statusLabel.Parent = inputFrame
-
--- =============================================================================
--- DRAGGABLE FUNCTIONALITY (For Mobile)
--- =============================================================================
-
-local dragging = false
-local dragStart = Vector2.new(0, 0)
-local startPos = Vector2.new(0, 0)
-
--- Start dragging when title bar is touched
-titleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = Vector2.new(input.Position.X, input.Position.Y)
-        startPos = Vector2.new(mainFrame.Position.X.Offset, mainFrame.Position.Y.Offset)
+CreateTab:CreateSlider({
+    Name = "الوزن (KG)",
+    Range = {1, 200},
+    Increment = 1,
+    Suffix = "KG",
+    CurrentValue = 50,
+    Callback = function(Value)
+        petWeight = Value
     end
-end)
+})
 
--- Move frame while dragging
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-        local delta = Vector2.new(input.Position.X - dragStart.X, input.Position.Y - dragStart.Y)
-        mainFrame.Position = UDim2.new(0, startPos.X + delta.X, 0, startPos.Y + delta.Y)
+CreateTab:CreateSlider({
+    Name = "العمر",
+    Range = {0, 100},
+    Increment = 1,
+    Suffix = "أيام",
+    CurrentValue = 0,
+    Callback = function(Value)
+        petAge = Value
     end
-end)
+})
 
--- Stop dragging
-game:GetService("UserInputService").InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-
--- =============================================================================
--- INITIALIZE PET SYSTEM (EXACTLY like original)
--- =============================================================================
-
-local petSystem = PetSystem.new()
-
--- Store in _G like original (Line 486)
-_G.PetSystem = petSystem
-
--- =============================================================================
--- CREATE PET FUNCTION (Using original system)
--- =============================================================================
-
-createButton.MouseButton1Click:Connect(function()
-    local petName = nameBox.Text
-    local weight = tonumber(weightBox.Text)
-    local age = tonumber(ageBox.Text)
-    
-    -- Simple validation
-    if not petName or #petName < 2 then
-        statusLabel.Text = "❌ Enter pet name"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        return
-    end
-    
-    if not weight or weight < 1 or weight > 1000 then
-        statusLabel.Text = "❌ Weight: 1-1000"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        return
-    end
-    
-    if not age or age < 0 or age > 100 then
-        statusLabel.Text = "❌ Age: 0-100"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        return
-    end
-    
-    -- CREATE PET USING ORIGINAL SYSTEM
-    local petData = petSystem:AddPet(localPlayer, petName, nil, weight, age)
-    
-    if petData then
-        statusLabel.Text = "✅ " .. petName .. " created!\nCheck your Backpack!"
-        statusLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
+CreateTab:CreateButton({
+    Name = "🐾 إنشاء حيوان جديد",
+    Callback = function()
+        if not localPlayer.Character then return end
         
-        -- Optional: Clear inputs
-        nameBox.Text = ""
-        weightBox.Text = tostring(math.random(20, 80))
-        ageBox.Text = tostring(math.random(1, 10))
-    else
-        statusLabel.Text = "❌ Failed to create pet"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        local petSystem = _G.PetSystem or PetSystem.new()
+        _G.PetSystem = petSystem
+        
+        local petData = petSystem:CreateRealPet(
+            localPlayer, 
+            petName, 
+            petWeight, 
+            petAge
+        )
+        
+        Rayfield:Notify({
+            Title = "✅ تم إنشاء الحيوان",
+            Content = "UUID: " .. petData.UUID,
+            Duration = 5
+        })
+    end
+})
+
+-- تبويب إدارة الحيوانات
+local ManageTab = Window:CreateTab("حيواناتي", nil)
+
+ManageTab:CreateButton({
+    Name = "🔄 تحديث القائمة",
+    Callback = function()
+        local petSystem = _G.PetSystem
+        if not petSystem then return end
+        
+        local pets = petSystem:GetPlayerPets(localPlayer)
+        
+        for _, uuid in pairs(pets) do
+            local petData = petSystem.Pets[uuid]
+            if petData then
+                ManageTab:CreateLabel(
+                    "🐾 " .. petData.Type .. 
+                    " | الوزن: " .. petData.Attributes.Weight .. "KG" ..
+                    " | العمر: " .. petData.Attributes.Age .. " يوم"
+                )
+            end
+        end
+    end
+})
+
+-- تبويب الأوامر
+local CommandsTab = Window:CreateTab("أوامر", nil)
+
+CommandsTab:CreateButton({
+    Name = "📊 عرض كل الحيوانات في _G",
+    Callback = function()
+        local petSystem = _G.PetSystem
+        if not petSystem then return end
+        
+        print("===== كل الحيوانات في النظام =====")
+        for uuid, data in pairs(petSystem.Pets) do
+            print("UUID:", uuid)
+            print("النوع:", data.Type)
+            print("المالك:", data.OwnerName)
+            print("الوزن:", data.Attributes.Weight)
+            print("العمر:", data.Attributes.Age)
+            print("------------------------")
+        end
+    end
+})
+
+-- ====================
+-- 9. النظام التلقائي
+-- ====================
+local autoSystem = Window:CreateTab("النظام التلقائي", nil)
+
+local autoFollow = true
+autoSystem:CreateToggle({
+    Name = "👣 المتابعة التلقائية",
+    CurrentValue = true,
+    Callback = function(Value)
+        autoFollow = Value
+    end
+})
+
+-- تحديث سنوي تلقائي
+spawn(function()
+    while true do
+        wait(60) -- كل دقيقة (يمكن تغييره لـ 86400 ليكون يومي)
+        
+        local petSystem = _G.PetSystem
+        if petSystem then
+            for uuid, petData in pairs(petSystem.Pets) do
+                if petData.Owner == localPlayer.UserId then
+                    petData.Attributes.Age = petData.Attributes.Age + 1
+                    
+                    -- تحديث النموذج
+                    local model = petSystem.PetModels[uuid]
+                    if model then
+                        model:SetAttribute("Age", petData.Attributes.Age)
+                    end
+                end
+            end
+        end
     end
 end)
 
--- =============================================================================
--- AUTO CREATE TEST PET (Like original Line 488-490)
--- =============================================================================
+-- ====================
+-- 10. التنبيهات
+-- ====================
+Rayfield:Notify({
+    Title = "🐾 نظام الحيوانات جاهز",
+    Content = "يمكنك الآن إنشاء حيواناتك الأليفة!",
+    Duration = 6
+})
 
-wait(2)
-petSystem:AddPet(localPlayer, "Test Dragon", nil, 45, 2)
-statusLabel.Text = "✅ Test pet added!\nTry creating your own..."
+-- ====================
+-- 11. تعيين النظام في _G
+-- ====================
+_G.PetSystem = PetSystem.new()
 
--- =============================================================================
--- FINAL MESSAGE (Like original print statements)
--- =============================================================================
-
-print("========================================")
-print("Pet System Loaded Successfully!")
-print("Drag the blue bar to move window")
-print("Check Backpack for created pets")
-print("========================================")
-
--- Return system for external access (Like original Line 507-519)
-return {
-    PetSystem = _G.PetSystem,
-    GetSystemInfo = function()
-        return {
-            Name = "Mobile Pet System",
-            Version = "1.0",
-            Description = "Creates pets with name, weight, and age",
-            OriginalFeatures = {
-                "UUID generation for each pet",
-                "Pet data storage system",
-                "Tool creation in Backpack",
-                "Attributes system (like original)"
-            }
-        }
-    end
-}
+print("✅ نظام الحيوانات المحمول جاهز للاستخدام!")
+print("📱 تم تصميمه للعمل على الهاتف")
+print("🔗 التشغيل: loadstring(game:HttpGet('رابط_السكريبت'))()")
