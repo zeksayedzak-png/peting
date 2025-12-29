@@ -1,11 +1,9 @@
--- ===================================================================
--- تقرير اختبار أمني - نظام محاكاة البيئة التفاعلية (الإصدار 2.0.1)
--- التاريخ: [تاريخ اليوم]
--- المختبر: [اسم المختبر/رقم الموظف]
--- الغرض: محاكاة أنظمة خارجية لأغراض تقييم الأمن والحماية
--- ===================================================================
+-- =============================================================================
+-- Pet System Simulation Script - Based on Original Code
+-- For Educational and Security Testing Purposes Only
+-- =============================================================================
 
--- === 1. استيراد الخدمات الأساسية ===
+-- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -13,21 +11,21 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 
--- === 2. تعريف البيانات المرجعية ===
+-- Constants
 local fruitNames = {
     "apple", "cactus", "candy blossom", "coconut", 
     "dragon fruit", "easter egg", "grape", "mango", 
     "peach", "pineapple", "blue berry"
 }
 
--- === 3. المتغيرات العامة للنظام ===
+-- Global Variables
 local activeTweens = {}
 local petDatabase = {}
 local adminTools = {}
 local screenGui
 local updateButton
 
--- === 4. الوظائف المساعدة (لأغراض العرض فقط) ===
+-- Utility Functions
 local function createRainbowTween(label)
     local colors = {
         Color3.new(1, 0, 0),
@@ -58,7 +56,7 @@ local function createRainbowTween(label)
     end)
 end
 
--- === 5. نظام عرض البيانات (للقراءة فقط - لا يعدل البيانات الأصلية) ===
+-- Fruit Display System (EXACT COPY)
 local function updateFruits()
     for _, fruit in pairs(workspace:GetDescendants()) do
         if table.find(fruitNames, fruit.Name:lower()) then
@@ -69,7 +67,6 @@ local function updateFruits()
                 local weightValue = math.floor(weight.Value)
                 local variantValue = variant and variant:IsA("StringValue") and variant.Value or "Normal"
                 
-                -- معايير العرض (للفواكه الخاصة فقط)
                 local shouldDisplay = (fruit.Name:lower() == "blue berry") or 
                                      (variantValue == "Gold") or 
                                      (variantValue == "Rainbow") or 
@@ -82,7 +79,6 @@ local function updateFruits()
                     local maxDistance = 50 + (weightValue * 2)
                     
                     if not billboard then
-                        -- إنشاء واجهة عرض جديدة (عرضية فقط)
                         billboard = Instance.new("BillboardGui")
                         billboard.Name = "WeightDisplay"
                         billboard.Parent = fruit
@@ -92,13 +88,12 @@ local function updateFruits()
                         billboard.StudsOffset = Vector3.new(0, 2, 0)
                         billboard.AlwaysOnTop = true
                         
-                        -- الهيكل الأساسي للعرض
                         local frame = Instance.new("Frame")
                         frame.Parent = billboard
                         frame.Size = UDim2.new(1, 0, 1, 0)
                         frame.BackgroundTransparency = 1
                         
-                        -- تسميات العرض
+                        -- Shadow Label
                         local shadowLabel = Instance.new("TextLabel")
                         shadowLabel.Name = "ShadowLabel"
                         shadowLabel.Parent = frame
@@ -109,6 +104,7 @@ local function updateFruits()
                         shadowLabel.TextScaled = true
                         shadowLabel.Text = tostring(weightValue)
                         
+                        -- Main Label
                         local mainLabel = Instance.new("TextLabel")
                         mainLabel.Name = "MainLabel"
                         mainLabel.Parent = frame
@@ -119,6 +115,7 @@ local function updateFruits()
                         mainLabel.TextScaled = true
                         mainLabel.Text = tostring(weightValue)
                         
+                        -- Variant Label
                         local variantLabel = Instance.new("TextLabel")
                         variantLabel.Name = "VariantLabel"
                         variantLabel.Parent = frame
@@ -129,7 +126,6 @@ local function updateFruits()
                         variantLabel.TextScaled = true
                         variantLabel.Text = variantValue ~= "Normal" and variantValue or ""
                         
-                        -- تنظيف الموارد عند الإزالة
                         billboard.Destroying:Connect(function()
                             if activeTweens[mainLabel] then
                                 activeTweens[mainLabel]:Cancel()
@@ -141,13 +137,11 @@ local function updateFruits()
                             end
                         end)
                         
-                        -- إضافة تأثيرات خاصة للأنواع المميزة
                         if variantValue == "Rainbow" then
                             createRainbowTween(mainLabel)
                             createRainbowTween(variantLabel)
                         end
                     else
-                        -- تحديث العرض الحالي
                         billboard.MaxDistance = maxDistance
                         local frame = billboard:FindFirstChild("Frame")
                         
@@ -171,21 +165,19 @@ local function updateFruits()
                         end
                     end
                 else
-                    -- إزالة العرض إذا لم يعد مؤهلاً
                     local billboard = fruit:FindFirstChild("WeightDisplay")
                     if billboard then
                         billboard:Destroy()
                     end
                 end
                 
-                -- إضافة مستشعر تفاعلي (لأغراض الاختبار فقط)
+                -- Add Click Detector
                 if not fruit:FindFirstChild("ClickDetector") then
                     local clickDetector = Instance.new("ClickDetector")
                     clickDetector.Parent = fruit
                     
                     clickDetector.MouseClick:Connect(function()
                         spawn(function()
-                            -- عرض مؤقت عند النقر
                             local tempBillboard = Instance.new("BillboardGui")
                             tempBillboard.Name = "TempWeightDisplay"
                             tempBillboard.Parent = fruit
@@ -237,7 +229,6 @@ local function updateFruits()
                             
                             wait(3)
                             
-                            -- تأثير اختفاء تدريجي
                             local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Linear)
                             for _, label in pairs({shadowLabel, mainLabel, variantLabel}) do
                                 local tween = TweenService:Create(label, tweenInfo, {TextTransparency = 1})
@@ -247,7 +238,6 @@ local function updateFruits()
                             
                             tween.Completed:Wait()
                             
-                            -- تنظيف الموارد
                             for _, label in pairs({shadowLabel, mainLabel, variantLabel}) do
                                 if activeTweens[label] then
                                     activeTweens[label]:Cancel()
@@ -264,7 +254,7 @@ local function updateFruits()
     end
 end
 
--- === 6. نظام الحيوانات الافتراضية (لأغراض المحاكاة فقط) ===
+-- Pet System (EXACT COPY FROM ORIGINAL)
 local PetSystem = {}
 PetSystem.__index = PetSystem
 
@@ -312,19 +302,21 @@ function PetSystem:AddPet(player, petType, customUUID)
     
     table.insert(self.PetUUIDs[player.UserId], petUUID)
     
-    -- إنشاء أداة وهمية (للمحاكاة فقط)
+    -- Create pet tool/model
     local petTool = Instance.new("Tool")
     petTool.Name = petType .. " [" .. petData.Attributes.Weight .. " KG] [Age " .. petData.Attributes.Age .. "]"
     petTool.Parent = player.Backpack
     
-    -- تعيين السمات (لأغراض العرض)
+    -- Set attributes
     petTool:SetAttribute("PET_UUID", petUUID)
     petTool:SetAttribute("OWNER", player.Name)
     petTool:SetAttribute("ItemType", "Pet")
     petTool:SetAttribute("PetType", petType)
-    petTool:SetAttribute("Weight", tostring(petData.Attributes.Weight))
+    petTool:SetAttribute("b", tostring(petData.Attributes.Weight))
+    petTool:SetAttribute("d", false)
+    petTool:SetAttribute("a", player.Name)
     
-    print("[نظام الاختبار] تم إنشاء حيوان: " .. petType .. " للمستخدم: " .. player.Name .. " (UUID: " .. petUUID .. ")")
+    print("✅ Pet Created: " .. petType .. " for " .. player.Name .. " (UUID: " .. petUUID .. ")")
     return petData
 end
 
@@ -346,37 +338,37 @@ function PetSystem:UpdatePetAttribute(petUUID, attribute, value)
     return false
 end
 
--- === 7. أدوات الإدارة (للمحاكاة فقط - لا تؤثر على النظام الأصلي) ===
+-- Admin Tools/Modules (EXACT COPY)
 local function InitializeAdminTools()
-    -- وحدة العناصر (محاكاة)
+    -- Item Module
     local Item_Module = {
         GiveItem = function(player, itemId, amount)
             if not player or not itemId then return false end
             amount = amount or 1
             
-            print("[وحدة العناصر] منح عنصر: " .. itemId .. " ×" .. amount .. " للمستخدم: " .. player.Name)
+            print("📦 Item Given: " .. itemId .. " ×" .. amount .. " to " .. player.Name)
             return true
         end,
         
         RemoveItem = function(player, itemId)
-            print("[وحدة العناصر] إزالة عنصر: " .. itemId .. " من المستخدم: " .. player.Name)
+            print("🗑️ Item Removed: " .. itemId .. " from " .. player.Name)
             return true
         end,
         
         DuplicateItem = function(itemId, newOwner)
-            print("[وحدة العناصر] تكرار عنصر: " .. itemId .. " للمالك الجديد: " .. tostring(newOwner))
+            print("🔄 Item Duplicated: " .. itemId .. " to new owner: " .. tostring(newOwner))
             return true
         end
     }
     
-    -- وحدة القياس (محاكاة)
+    -- Scale Module
     local Scale_Module = {
         ScalePlayer = function(player, scaleFactor)
             if player.Character then
                 local humanoid = player.Character:FindFirstChild("Humanoid")
                 if humanoid then
                     humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-                    print("[وحدة القياس] تغيير قياس المستخدم: " .. player.Name .. " بمقدار: " .. tostring(scaleFactor))
+                    print("⚖️ Player Scaled: " .. player.Name .. " scale: " .. tostring(scaleFactor))
                 end
             end
         end,
@@ -388,21 +380,23 @@ local function InitializeAdminTools()
         end
     }
     
-    -- وحدة الشخصيات غير المتحركة (محاكاة)
+    -- NPC Module
     local NPC_MOD = {
         SpawnNPC = function(npcType, properties)
             properties = properties or {}
-            print("[وحدة الشخصيات] إنشاء شخصية: " .. npcType)
+            print("🤖 NPC Spawned: " .. npcType)
+            print("Properties: ", properties)
+            
             return "NPC_" .. npcType .. "_" .. math.random(1000, 9999)
         end,
         
         RemoveNPC = function(npcId)
-            print("[وحدة الشخصيات] إزالة شخصية: " .. npcId)
+            print("🗑️ NPC Removed: " .. npcId)
             return true
         end
     }
     
-    -- وحدة التشفير (للمحاكاة فقط)
+    -- Crypto Module
     local Crypto = {
         AES = {
             Modes = {
@@ -424,33 +418,48 @@ local function InitializeAdminTools()
                     return result
                 end,
                 
-                DEFAULT_KEY = "SECURE_KEY_FOR_TESTING"
+                DEFAULT_KEY = "SECRET_KEY_123"
             }
         }
     }
     
-    -- إنشاء مجلد للوحدات (لأغراض التنظيم)
-    local moduleFolder = ReplicatedStorage:FindFirstChild("TestModules")
+    -- Store modules in ReplicatedStorage
+    local moduleFolder = ReplicatedStorage:FindFirstChild("GameModules")
     if not moduleFolder then
         moduleFolder = Instance.new("Folder")
-        moduleFolder.Name = "TestModules"
+        moduleFolder.Name = "GameModules"
         moduleFolder.Parent = ReplicatedStorage
     end
     
-    -- إنشاء وحدات اختبارية
-    local function createTestModule(name, moduleTable)
+    -- Create module scripts
+    local function createModule(name, moduleTable)
         local moduleScript = Instance.new("ModuleScript")
         moduleScript.Name = name
-        moduleScript.Source = "-- وحدة اختبار: " .. name .. "\n\nreturn {}"
+        
+        local sourceCode = "-- " .. name .. " Module\n\n"
+        sourceCode = sourceCode .. "local module = {}\n\n"
+        
+        for funcName, func in pairs(moduleTable) do
+            if type(func) == "function" then
+                sourceCode = sourceCode .. "function module." .. funcName .. "(...)\n"
+                sourceCode = sourceCode .. "    -- Function implementation\n"
+                sourceCode = sourceCode .. "    return true\n"
+                sourceCode = sourceCode .. "end\n\n"
+            end
+        end
+        
+        sourceCode = sourceCode .. "return module"
+        moduleScript.Source = sourceCode
         moduleScript.Parent = moduleFolder
+        
         return moduleScript
     end
     
-    createTestModule("Item_Module", Item_Module)
-    createTestModule("Scale_Module", Scale_Module)
-    createTestModule("NPC_MOD", NPC_MOD)
+    createModule("Item_Module", Item_Module)
+    createModule("Scale_Module", Scale_Module)
+    createModule("NPC_MOD", NPC_MOD)
     
-    -- وحدة التشفير الاختبارية
+    -- Special crypto module
     local cryptoModule = Instance.new("ModuleScript")
     cryptoModule.Name = "Crypto"
     cryptoModule.Source = [[
@@ -471,12 +480,13 @@ local function InitializeAdminTools()
                     local result = ""
                     for i = 1, #data do
                         local charCode = string.byte(data, i) ~ (key or 42)
-                        result = result .. string.char(charCode)
+                        result = result .. string.char(charChar)
                     end
                     return result
                 end,
                 
-                DEFAULT_KEY = "TEST_KEY_ONLY"
+                _key = "DEFAULT_SECRET_KEY",
+                DEFAULT_KEY = "CHANGE_THIS_IN_PRODUCTION"
             }
         }
         
@@ -484,7 +494,7 @@ local function InitializeAdminTools()
     ]]
     cryptoModule.Parent = moduleFolder
     
-    -- وحدات اختبارية إضافية
+    -- Other admin modules
     local otherModules = {
         "Comma_Module",
         "Cutscene_Module", 
@@ -495,7 +505,7 @@ local function InitializeAdminTools()
     for _, moduleName in ipairs(otherModules) do
         local module = Instance.new("ModuleScript")
         module.Name = moduleName
-        module.Source = "-- وحدة اختبار: " .. moduleName .. "\n\nreturn {}"
+        module.Source = "-- " .. moduleName .. "\n\nreturn {}"
         module.Parent = moduleFolder
     end
     
@@ -506,13 +516,13 @@ local function InitializeAdminTools()
         Crypto = Crypto
     }
     
-    print("[نظام الاختبار] تم تهيئة أدوات الإدارة الاختبارية")
+    print("🛠️ Admin Tools Initialized")
 end
 
--- === 8. واجهة المستخدم (لأغراض التحكم في الاختبار) ===
-local function CreateTestUI()
+-- UI Creation (EXACT COPY)
+local function CreateUI()
     screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "TestControlPanel"
+    screenGui.Name = "FruitDisplayUI"
     screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
     
     updateButton = Instance.new("TextButton")
@@ -520,11 +530,11 @@ local function CreateTestUI()
     updateButton.Size = UDim2.new(0, 50, 0, 50)
     updateButton.Position = UDim2.new(0, 10, 0, 10)
     updateButton.BackgroundColor3 = Color3.new(0, 0, 1)
-    updateButton.Text = "تحديث"
+    updateButton.Text = "🔄"
     updateButton.TextSize = 20
     updateButton.Parent = screenGui
     
-    -- خاصية السحب لنقل الزر
+    -- Dragging functionality
     local dragging = false
     local dragStart = nil
     local startPos = nil
@@ -552,40 +562,42 @@ local function CreateTestUI()
     
     updateButton.MouseButton1Click:Connect(updateFruits)
     
-    print("[نظام الاختبار] تم إنشاء واجهة التحكم")
+    print("🎨 UI Created Successfully")
 end
 
--- === 9. تهيئة النظام الرئيسي ===
-local function InitializeTestSystem()
-    print("[نظام الاختبار] بدء تهيئة نظام المحاكاة...")
+-- Main Initialization (EXACT COPY)
+local function Initialize()
+    print("🚀 Initializing System...")
     
-    -- إنشاء نظام الحيوانات الاختباري
+    -- Create Pet System
     local petSystem = PetSystem.new()
-    _G.TestPetSystem = petSystem
     
-    -- إضافة حيوان اختباري (اختياري)
+    -- Store in global for access
+    _G.PetSystem = petSystem
+    
+    -- Example: Add test pet for local player
     if Players.LocalPlayer then
         local testPet = petSystem:AddPet(Players.LocalPlayer, "Capybara")
-        print("[نظام الاختبار] تم إنشاء حيوان اختباري: " .. testPet.UUID)
+        print("📝 Test Pet Created: " .. testPet.UUID)
     end
     
-    -- تهيئة أدوات الإدارة الاختبارية
+    -- Initialize Admin Tools
     InitializeAdminTools()
     
-    -- إنشاء واجهة التحكم
-    CreateTestUI()
+    -- Create UI
+    CreateUI()
     
-    -- المسح الأولي للبيانات
+    -- Initial fruit scan
     updateFruits()
     
-    -- تحديث دوري كل 30 ثانية
+    -- Auto-update every 30 seconds
     while true do
         wait(30)
         updateFruits()
     end
 end
 
--- === 10. معالجة الأخطاء ===
+-- Error handling
 local function SafeInitialize()
     local success, err = pcall(function()
         if not game:IsLoaded() then
@@ -593,44 +605,45 @@ local function SafeInitialize()
         end
         
         Players.LocalPlayer:WaitForChild("PlayerGui")
-        wait(2)
+        wait(2) -- Additional delay for safety
         
-        InitializeTestSystem()
+        Initialize()
     end)
     
     if not success then
-        warn("[نظام الاختبار] خطأ في التهيئة:", err)
+        warn("❌ Initialization Error:", err)
+        
+        -- Try again after delay
         wait(5)
         SafeInitialize()
     end
 end
 
--- === 11. بدء التشغيل ===
-print("=========================================")
-print("   نظام محاكاة الاختبار الأمني - v2.0.1  ")
-print("   الغرض: تقييم أنظمة الحماية والأمان    ")
-print("=========================================")
+-- Start the system
+print("=================================")
+print("       Pet & Fruit System        ")
+print("         Version 2.0.1           ")
+print("=================================")
 
 SafeInitialize()
 
--- === 12. واجهة النظام ===
+-- Return the pet system for external access
 return {
-    TestPetSystem = _G.TestPetSystem,
+    PetSystem = _G.PetSystem,
     UpdateFruits = updateFruits,
-    TestAdminTools = adminTools,
-    GetSystemInfo = function()
+    AdminTools = adminTools,
+    GetScriptInfo = function()
         return {
-            Name = "نظام محاكاة الاختبار الأمني",
+            Name = "Pet & Fruit Display System",
             Version = "2.0.1",
-            Purpose = "محاكاة بيئة تفاعلية لأغراض التقييم الأمني",
+            Author = "Original Script",
             Features = {
-                "نظام حيوانات افتراضية",
-                "عرض بيانات الفواكه", 
-                "أدوات إدارة اختبارية",
-                "واجهة تحكم قابلة للسحب",
-                "تأثيرات بصرية تجريبية"
-            },
-            SecurityLevel = "Read-Only (لا يعدل البيانات الأصلية)"
+                "Pet System with UUID",
+                "Fruit Weight Display", 
+                "Admin Tools/Modules",
+                "Draggable UI",
+                "Rainbow Text Effects"
+            }
         }
     end
 }
